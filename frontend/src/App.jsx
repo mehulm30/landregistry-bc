@@ -11,6 +11,7 @@ function App() {
   const [contract, setContract] = useState(null);
   const [configError, setConfigError] = useState(null);
   const [network, setNetwork] = useState(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
     try {
@@ -81,12 +82,15 @@ function App() {
       setStatus('MetaMask is not installed');
       return;
     }
+    setIsConnecting(true);
     try {
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       handleAccountsChanged(accounts);
     } catch (error) {
       console.error(error);
       setStatus('Connection rejected');
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -129,42 +133,106 @@ function App() {
 
   const contractLoaded = useMemo(() => !!contract && account, [contract, account]);
 
-  return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24, maxWidth: 900, margin: '0 auto' }}>
-      <header>
-        <h1>Land Registry using IPFS</h1>
-        {configError && (
-          <div style={{ background: '#fee2e2', color: '#991b1b', padding: 12, borderRadius: 8, marginBottom: 16 }}>
-            <strong>⚠ Configuration Error:</strong> {configError}
-          </div>
-        )}
-        {network && (
-          <div style={{ fontSize: 14, marginBottom: 12, color: '#666' }}>
-            Network: <strong>{network.name}</strong> (Chain ID: {network.chainId})
-          </div>
-        )}
-        <p>{status}</p>
-        <div>
-          <button onClick={connectWallet} disabled={!!configError} style={{ padding: '10px 16px', borderRadius: 8, marginRight: 8 }}>
-            {account ? `Connected: ${account.slice(0, 6)}...${account.slice(-4)}` : 'Connect MetaMask'}
-          </button>
-          {account && network && network.chainId !== 11155111n && (
-            <button onClick={switchToSepolia} style={{ padding: '10px 16px', borderRadius: 8, background: '#dc2626' }}>
-              Switch to Sepolia
-            </button>
-          )}
-        </div>
-      </header>
+  const getStatusClass = () => {
+    if (configError) return 'status-warning';
+    if (account && network?.chainId === 11155111n) return 'status-connected';
+    return 'status-disconnected';
+  };
 
-      <main style={{ marginTop: 24 }}>
-        {!configError && (
-          <>
-            <RegisterLand contract={contract} enabled={contractLoaded} />
-            <TransferLand contract={contract} enabled={contractLoaded} />
-            <QueryLand contract={contract} enabled={contractLoaded} />
-          </>
-        )}
-      </main>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <header className="text-center mb-12">
+          <div className="web3-card p-8 mb-8">
+            <h1 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              🌍 Land Registry dApp
+            </h1>
+            <p className="text-white/80 text-lg">
+              Secure land registration on the blockchain with IPFS document storage
+            </p>
+          </div>
+
+          {/* Wallet Connection Status */}
+          <div className={`web3-card p-6 mb-6 ${getStatusClass()}`}>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white mb-2">Wallet Status</h3>
+                <p className="text-white/90">{status}</p>
+                {network && (
+                  <p className="text-sm text-white/70 mt-1">
+                    Network: <span className="font-medium">{network.name}</span> (Chain ID: {network.chainId})
+                  </p>
+                )}
+                {account && (
+                  <p className="text-sm text-white/70 mt-1 font-mono">
+                    {account.slice(0, 6)}...{account.slice(-4)}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-3">
+                {!account ? (
+                  <button
+                    onClick={connectWallet}
+                    disabled={!!configError || isConnecting}
+                    className="web3-button disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isConnecting && <div className="spinner"></div>}
+                    {isConnecting ? 'Connecting...' : '🔗 Connect MetaMask'}
+                  </button>
+                ) : account && network && network.chainId !== 11155111n && (
+                  <button
+                    onClick={switchToSepolia}
+                    className="web3-button bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
+                  >
+                    🔄 Switch to Sepolia
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {configError && (
+            <div className="web3-card p-4 status-warning">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <h4 className="font-semibold text-white">Configuration Error</h4>
+                  <p className="text-white/90">{configError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </header>
+
+        {/* Main Content */}
+        <main className="space-y-8">
+          {!configError && (
+            <>
+              <RegisterLand contract={contract} enabled={contractLoaded} />
+              <TransferLand contract={contract} enabled={contractLoaded} />
+              <QueryLand contract={contract} enabled={contractLoaded} />
+            </>
+          )}
+        </main>
+
+        {/* Footer */}
+        <footer className="mt-16 text-center">
+          <div className="web3-card p-6">
+            <p className="text-white/80 text-sm">
+              Built with ❤️ using{' '}
+              <span className="text-blue-400 font-semibold">Ethereum</span>,{' '}
+              <span className="text-purple-400 font-semibold">IPFS</span>, and{' '}
+              <span className="text-green-400 font-semibold">React</span>
+            </p>
+            <div className="flex justify-center items-center gap-4 mt-4">
+              <span className="text-2xl">⛓️</span>
+              <span className="text-white/60 text-xs">Decentralized • Secure • Transparent</span>
+              <span className="text-2xl">🔒</span>
+            </div>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
